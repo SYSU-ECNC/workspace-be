@@ -5,12 +5,14 @@ import (
 	"net/http"
 
 	"github.com/SYSU-ECNC/workspace-be/internal/pkg/config"
+	"github.com/SYSU-ECNC/workspace-be/internal/pkg/db"
 	"github.com/SYSU-ECNC/workspace-be/internal/pkg/sessions"
 	"github.com/dghubble/gologin"
 	gologinOAuth2 "github.com/dghubble/gologin/oauth2"
 	"github.com/dghubble/sling"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
+	"gorm.io/gorm/clause"
 )
 
 type ECNCUserInfo struct {
@@ -50,7 +52,19 @@ func callbackSuccess(c *gin.Context, token string) {
 		panic(err)
 	}
 
-	session.Set("user", user)
+	dbUser := &db.User{
+		NetID: user.NetID,
+		Name:  user.Name,
+		Email: user.Email,
+		Level: user.Level,
+	}
+
+	db.Db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "netID"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name", "level", "email"}),
+	}).Create(dbUser)
+
+	session.Set("user", dbUser)
 	session.Save()
 
 	c.JSON(200, session.Get("user"))
